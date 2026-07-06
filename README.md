@@ -1,4 +1,4 @@
-# Critical Band Interference in Whisper
+# Whisper Critical Bands
 
 Causal mapping of Whisper's spectral vulnerabilities — narrowband notching (200–4000 Hz) reveals critical frequency bands where spectral removal causes misrecognition, with a dynamic anchor chain that restores perfect recognition.
 
