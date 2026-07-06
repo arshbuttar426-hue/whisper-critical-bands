@@ -46,10 +46,11 @@ Critically, we demonstrate a \emph{synthesis barrier}: every approach to
 synthesize speech from extracted spectral features---pure sine tones, multiband
 filterbanks, amplitude-normalized bands, log-compressed trajectories, iterative
 residual chains, formant resonator TTS, and physiologically modulated
-envelopes---produces empty or hallucinated transcripts (100\% WER). This barrier
-is not caused by band count, amplitude balance, or envelope structure; we argue
-it stems from the loss of cross-band phase relationships and temporal fine
-structure that sine-based synthesis cannot reproduce.
+envelopes---produces empty or hallucinated transcripts (100\% WER). Several factors may contribute to this barrier, including
+synthesis artifacts, inexact envelope extraction, mismatch between our
+synthesis and Whisper's log-Mel frontend, and the loss of cross-band phase
+relationships and temporal fine structure that sine-based synthesis cannot
+reproduce. Disentangling these factors is an open problem.
 
 Our results establish that Whisper's acoustic model is causally dependent on
 narrow spectral bands in a way that permits targeted restoration but prohibits
@@ -86,12 +87,12 @@ resulting WER impact. This causal intervention approach reveals:
         hallucination patterns per band.
     \item \textbf{Dynamic anchor restoration}: injecting a trajectory-following
         sine wave into a notched critical band restores perfect recognition---a
-        causal proof that the notched information is both necessary (without it,
-        Whisper fails) and sufficient (with it, Whisper succeeds).
+        causal evidence that the notched spectral information is necessary for correct
+        recognition.
     \item \textbf{The synthesis barrier}: extracting spectral envelopes from all
         critical bands simultaneously and synthesizing from them produces empty
-        transcripts, revealing a fundamental limitation of sine-based speech
-        synthesis for ASR models.
+        transcripts, revealing a limitation of sine-based speech
+        synthesis for ASR models that merits further investigation.
 \end{enumerate}
 
 We present these findings as a step toward understanding the spectral-level
@@ -341,9 +342,9 @@ and /l/ formant, injecting energy precisely where the notch removed it.
 For ``i am a superman'', restoration is limited to 25\% WER due to the schwa
 phoneme /{schwa}/ in ``a''. The schwa is broadband by nature; any
 single-frequency notch removes energy across its entire spectral span, and no
-single-frequency chain can restore it. This establishes a \emph{non-restorable
-phoneme floor}: words containing /{schwa}/ have a minimum achievable WER of
-25\%.
+single-frequency chain can restore it. This may indicate that the schwa requires restoration across
+multiple frequency bands simultaneously---a hypothesis that could be tested
+with multi-band chain synthesis.
 
 \subsection{The Synthesis Barrier}
 
@@ -376,9 +377,8 @@ Heart-rate handover modulation & (empty) & 100\% \\
 \end{table}
 
 The synthesis barrier persists regardless of band count, amplitude balance,
-envelope structure, phase coherence, or physiological rhythm. This is a
-\emph{fundamental} limitation: sine+envelope synthesis cannot produce
-recognizable speech for Whisper. The notch+chain cycle succeeds only because the
+envelope structure, phase coherence, or physiological rhythm. These results suggest that sine+envelope synthesis cannot produce
+recognizable speech for Whisper under the conditions tested. The notch+chain cycle succeeds only because the
 original signal provides the correct spectral context in all other bands.
 
 \subsection{Chain-Only Synthesis}
@@ -432,10 +432,10 @@ dependencies that sine-based representations cannot satisfy:
 \end{itemize}
 
 \subsection{The Schwa Vulnerability}
-The non-restorable schwa (/{schwa}/) represents a fundamental limitation:
+The schwa (/{schwa}/) represents a challenging case:
 broadband phonemes that span the entire frequency range cannot be patched by a
 single-frequency chain. This suggests that Whisper represents the schwa as a
-distributed pattern across multiple frequency bands.
+distributed pattern requiring multi-band restoration.
 
 \subsection{Implications for Robustness and Interpretability}
 Our findings suggest that Whisper is vulnerable to narrowband spectral attacks
@@ -447,6 +447,26 @@ Whisper outputs ``go'' where ``glow'' is expected, the /g/ burst zone
 More broadly, the causal mapping methodology demonstrated here---notch, measure,
 restore, verify---provides a template for interpretability research on other
 neural audio models.
+
+\subsection{Relation to Whisper's Frontend}
+Whisper processes audio through an 80-channel log-Mel spectrogram with a
+window size of 25~ms and stride of 10~ms, covering approximately 125~Hz to
+7.6~kHz. Our notch perturbations (200~Hz bandwidth, centered at discrete
+frequencies) span approximately 1--2 Mel bins at low frequencies and 1 bin at
+high frequencies. This means each notch primarily affects a single Mel channel,
+with partial spillover into adjacent channels. The log amplitude compression
+($10 \cdot \log_{10}(\cdot)$) likely attenuates the notch's effect relative to
+linear representations, meaning the actual spectral damage may be larger than
+what the log-Mel representation shows. This is relevant to interpreting our
+depth threshold results: a $-2$~dB notch in the waveform translates to a smaller
+perturbation in log-Mel space, suggesting Whisper's vulnerability is even
+greater than the waveform-level measurements suggest.
+
+Conversely, the success of the dynamic anchor chain must be understood through
+this lens: the chain injects energy at specific Mel channel frequencies,
+restoring the log-Mel representation to a state closer to the original. Future
+work should directly analyze how notch perturbations propagate through the
+Mel filterbank, which would enable more precise targeting of critical channels.
 
 \subsection{Limitations}
 Our experiments use Whisper \emph{tiny} with TTS-generated audio. Future work
@@ -466,8 +486,7 @@ We have presented three principal findings about Whisper's acoustic model:
         zone (1500--1800~Hz) generalize across multiple words.
     \item \textbf{Dynamic anchor restoration}: a trajectory-following sine wave
         injected into a notched critical band restores perfect recognition
-        (30/30 at 0\% WER), proving the causal necessity and sufficiency of the
-        removed information.
+        (30/30 at 0\% WER), suggesting a causal dependence on the notched spectral region.
     \item \textbf{The synthesis barrier}: exhaustive attempts at bottom-up
         synthesis from spectral features fail universally, demonstrating that
         sine+envelope representations lack some essential property---likely
